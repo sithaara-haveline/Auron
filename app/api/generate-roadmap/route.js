@@ -21,25 +21,26 @@ export async function POST(request) {
       })
       .join(', ')
 
-    const prompt = `You are Auron, an AI career advisor for Indian engineering students. 
-    
+const prompt = `You are Auron, an expert AI career strategist for Indian engineering students.
+
 A student has shared their profile with you. Your job is to:
 1. Decide if they should pursue Masters or Placements (or explain why it is genuinely unclear)
 2. Generate a detailed, personalised semester-by-semester roadmap
+You MUST generate a highly practical, realistic roadmap. No generic advice.
 
 STUDENT PROFILE:
 - Name: ${profile.name}
 - Branch: ${profile.branch}
-- Current Semester: ${profile.semester}
+- Semester: ${profile.semester}
 - CGPA: ${profile.cgpa}
-- College Tier: ${profile.tier}
+- Tier: ${profile.tier}
 - Passout Year: ${profile.passoutYear}
-- Skills and confidence: ${skillSummary}
-- Dream future: ${profile.dreamFuture}
-- Dream target (company/university): ${profile.dreamTarget || 'Not specified'}
+- Skills: ${skillSummary}
+- Dream: ${profile.dreamFuture}
+- Target: ${profile.dreamTarget || 'Not specified'}
 - Priority: ${profile.priority}
-- Open to abroad: ${profile.abroad}
-- Funding preference: ${profile.funding}
+- Abroad: ${profile.abroad}
+- Funding: ${profile.funding}
 
 INSTRUCTIONS:
 - Be brutally practical, not motivational
@@ -58,12 +59,12 @@ PROFILE:
 
 Return ONLY valid JSON in this exact format, no other text:
 {
-  "recommendation": "Masters" or "Placements" or "Unclear",
-  "reasoning": "2-3 sentence honest explanation specific to this student",
+  "recommendation": "Masters" | "Placements" | "Unclear",
+  "reasoning": "2-3 lines specific to THIS student",
   "milestones": [
     {
-      "milestone_title": "specific action title",
-      "description": "what to do and why it matters for their specific goal",
+      "milestone_title": "Specific action (e.g. Build a CNN-based image classifier using TensorFlow)",
+      "description": "Explain exactly what to do and why it matters",
       "due_date": "YYYY-MM-DD",
       "category": "technical",
       "status": "pending",
