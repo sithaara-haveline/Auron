@@ -113,7 +113,7 @@ const S = {
     padding: '40px',
     width: '100%',
     maxWidth: '540px',
-    boxShadow: '0 4px 24px rgba(0,0,0,0.08)'
+    boxShadow: '0 4px 24px hsla(0, 0%, 0%, 0.08)'
   },
   label: {
     display: 'block',
@@ -126,25 +126,27 @@ const S = {
   input: {
     width: '100%',
     padding: '12px 14px',
-    border: '1px solid #DDD',
-    borderRadius: '8px',
-    fontSize: '15px',
-    fontFamily: 'Georgia, serif',
-    outline: 'none',
-    boxSizing: 'border-box',
-    marginBottom: '20px'
-  },
-  select: {
-    width: '100%',
-    padding: '12px 14px',
-    border: '1px solid #DDD',
+    border: '1px solid hsla(0, 0%, 0%, 0.08)',
     borderRadius: '8px',
     fontSize: '15px',
     fontFamily: 'Georgia, serif',
     outline: 'none',
     boxSizing: 'border-box',
     marginBottom: '20px',
-    background: 'white'
+    color: '#3d1f00'     
+  },
+  select: {
+    width: '100%',
+    padding: '12px 14px',
+    border: '1px solid hsla(0, 0%, 0%, 0.08)',
+    borderRadius: '8px',
+    fontSize: '15px',
+    fontFamily: 'Georgia, serif',
+    outline: 'none',
+    boxSizing: 'border-box',
+    marginBottom: '20px',
+    background: 'white',
+    color: '#3d1f00'
   },
   btn: {
     width: '100%',
@@ -741,10 +743,8 @@ if (userError) {
       })
 
       if (!response.ok) {
-        const errText = await response.text()
-        console.error('API ERROR:', errText)
-        throw new Error(errText)
-        }
+        console.error('API failed, continuing with fallback')
+      }
 
       // 5. Clear temp data and go to dashboard
       localStorage.removeItem('auron_temp')

@@ -1,9 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@supabase/supabase-js'
+import { GoogleGenerativeAI } from "@google/generative-ai"
+import { createClient } from "@supabase/supabase-js"
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY
-})
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -11,11 +9,12 @@ const supabase = createClient(
 )
 
 export async function POST(request) {
+  let userId = null
   try {
     const { userId, profile } = await request.json()
 
-    // Build the prompt — this is where Auron's intelligence lives
-    const skillSummary = Object.entries(profile.skills)
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" })
+    const skillSummary = Object.entries(profile.skills || {})
       .map(([skill, confidence]) => {
         const labels = ['', 'heard of it', 'basics only', 'can use it', 'comfortable', 'can teach it']
         return `${skill}: ${labels[confidence]}`
@@ -43,11 +42,19 @@ STUDENT PROFILE:
 - Funding preference: ${profile.funding}
 
 INSTRUCTIONS:
-- Give a frank, honest recommendation first (Masters or Placements) with 2-3 specific reasons based on THIS student's actual profile. Do not be generic.
+- Be brutally practical, not motivational
 - Then generate 6-10 roadmap milestones. Each milestone must be specific, not generic advice.
+- Each milestone must be SPECIFIC and ACTIONABLE
+- Mention exact tools, technologies, or exams where relevant
+- Avoid generic phrases like "improve skills"
+- Spread milestones realistically over time until ${profile.passoutYear}
+- Focus on outcomes that improve job or masters chances
 - For skill gaps: name the exact skill, why it matters for their specific dream target, and suggest one free resource (preferably NPTEL or YouTube).
-- Milestones must have realistic due dates based on their semester and passout year of ${profile.passoutYear}.
+- Give a frank, honest recommendation first (Masters or Placements) with 2-3 specific reasons based on THIS student's actual profile. Do not be generic.
 - Categories must be one of: technical, project, career, soft, exam, application
+
+PROFILE:
+    ${JSON.stringify(profile)}
 
 Return ONLY valid JSON in this exact format, no other text:
 {
@@ -65,28 +72,20 @@ Return ONLY valid JSON in this exact format, no other text:
   ]
 }`
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      messages: [{ role: 'user', content: prompt }]
-    })
+    const result = await model.generateContent(prompt)
+    const text = result.response.text()
 
-    const responseText = message.content[0].text
+    console.log("GEMINI RAW:", text)
 
-    // Extract JSON safely
-    const jsonStart = responseText.indexOf('{')
-    const jsonEnd = responseText.lastIndexOf('}') + 1
-    const cleanJson = responseText.slice(jsonStart, jsonEnd)
+    const jsonStart = text.indexOf('{')
+    const jsonEnd = text.lastIndexOf('}') + 1
+    const parsed = JSON.parse(text.slice(jsonStart, jsonEnd))
 
-    const parsed = JSON.parse(cleanJson)
-
-    // Save recommendation to Users table
     await supabase
-      .from('users')
+      .from('Users')
       .update({ chosen_path: parsed.recommendation })
       .eq('id', userId)
 
-    // Delete old roadmap, insert new
     await supabase.from('roadmap').delete().eq('user_id', userId)
 
     const milestones = parsed.milestones.map(m => ({
@@ -96,14 +95,36 @@ Return ONLY valid JSON in this exact format, no other text:
 
     await supabase.from('roadmap').insert(milestones)
 
-    return Response.json({
-      success: true,
-      recommendation: parsed.recommendation,
-      reasoning: parsed.reasoning
-    })
+    return Response.json({ success: true })
 
   } catch (error) {
-    console.error('Roadmap generation error:', error)
-    return Response.json({ error: error.message }, { status: 500 })
+    console.error("GEMINI ERROR:", error)
+    await supabase.from('roadmap').insert([
+    {
+      user_id: userId,
+      milestone_title: "Fallback milestone",
+      description: "AI failed, but system is working",
+      due_date: "2026-01-01",
+      category: "technical",
+      status: "pending",
+      version: 1
+    }
+  ])
+    return Response.json({
+      success: true,
+      fallback: true,
+      recommendation: "Unclear",
+      reasoning: "AI failed, showing default roadmap",
+      milestones: [
+        {
+          milestone_title: "Build 2 projects",
+          description: "Focus on practical work",
+          due_date: "2026-12-01",
+          category: "project",
+          status: "pending",
+          version: 1
+        }
+      ]
+    })
   }
 }
