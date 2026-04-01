@@ -10,6 +10,7 @@ export default function Dashboard() {
       const { data } = await supabase
         .from('roadmap')
         .select('*')
+        .eq('user_id', user.id)
 
       setRoadmap(data || [])
     }

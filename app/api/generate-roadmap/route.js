@@ -3,69 +3,115 @@ import { createClient } from "@supabase/supabase-js"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
 
+const model = genAI.getGenerativeModel({
+  model: "models/gemini-2.5-flash"
+})
+
+// Use service role key for server-side operations
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
 export async function POST(request) {
+  // userId declared here so catch block can access it
   let userId = null
-  try {
-    const { userId, profile } = await request.json()
+  let parsedProfile = null
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" })
-    const skillSummary = Object.entries(profile.skills || {})
+  try {
+    // FIXED: use let/destructure separately so userId stays in outer scope
+    const body = await request.json()
+    userId = body.userId
+    parsedProfile = body.profile
+
+    console.log("=== ROADMAP GENERATION START ===")
+    console.log("userId:", userId)
+    console.log("profile name:", parsedProfile?.name)
+
+    if (!userId) {
+      throw new Error("No userId provided in request body")
+    }
+
+    // Build skill summary
+    const skillSummary = Object.entries(parsedProfile.skills || {})
       .map(([skill, confidence]) => {
         const labels = ['', 'heard of it', 'basics only', 'can use it', 'comfortable', 'can teach it']
-        return `${skill}: ${labels[confidence]}`
+        return `${skill}: ${labels[confidence] || confidence}`
       })
-      .join(', ')
+      .join(', ') || 'No skills listed'
 
-const prompt = `You are Auron, an expert AI career strategist for Indian engineering students.
+    console.log("skillSummary:", skillSummary)
 
-A student has shared their profile with you. Your job is to:
-1. Decide if they should pursue Masters or Placements (or explain why it is genuinely unclear)
-2. Generate a detailed, personalised semester-by-semester roadmap
-You MUST generate a highly practical, realistic roadmap. No generic advice.
+    // Save/update user in DB first (before AI call)
+    console.log("Saving user to DB...")
+    const { data: savedUser, error: userError } = await supabase
+      .from('users')
+      .upsert({
+        id: userId,
+        name: parsedProfile.name,
+        college: parsedProfile.college,
+        branch: parsedProfile.branch,
+        cgpa: parseFloat(parsedProfile.cgpa) || 0,
+        passout_date: `${parsedProfile.passoutYear || 2027}-05-01`,
+        chosen_path: 'pending'
+      }, { onConflict: 'id' })
+      .select()
+      .single()
+
+    if (userError) {
+      console.error("User save error details:", JSON.stringify(userError))
+      // Don't throw — continue even if user save fails
+    } else {
+      console.log("User saved successfully:", savedUser?.id)
+    }
+
+    // Call Gemini
+    console.log("Calling Gemini...")
+
+    const prompt = `You are Auron, an AI career advisor for Indian engineering students.
 
 STUDENT PROFILE:
-- Name: ${profile.name}
-- Branch: ${profile.branch}
-- Semester: ${profile.semester}
-- CGPA: ${profile.cgpa}
-- Tier: ${profile.tier}
-- Passout Year: ${profile.passoutYear}
+- Name: ${parsedProfile.name}
+- Branch: ${parsedProfile.branch}
+- Semester: ${parsedProfile.semester}
+- CGPA: ${parsedProfile.cgpa}
+- College Tier: ${parsedProfile.tier}
+- Passout Year: ${parsedProfile.passoutYear}
 - Skills: ${skillSummary}
-- Dream: ${profile.dreamFuture}
-- Target: ${profile.dreamTarget || 'Not specified'}
-- Priority: ${profile.priority}
-- Abroad: ${profile.abroad}
-- Funding: ${profile.funding}
+- Dream future: ${parsedProfile.dreamFuture}
+- Dream target: ${parsedProfile.dreamTarget || 'Not specified'}
+- Priority: ${parsedProfile.priority}
+- Open to abroad: ${parsedProfile.abroad}
+- Funding: ${parsedProfile.funding}
 
-INSTRUCTIONS:
+Generate a personalised career recommendation and roadmap for this specific student.
+
+Rules:
 - Be brutally practical, not motivational
 - Then generate 6-10 roadmap milestones. Each milestone must be specific, not generic advice.
 - Each milestone must be SPECIFIC and ACTIONABLE
 - Mention exact tools, technologies, or exams where relevant
 - Avoid generic phrases like "improve skills"
-- Spread milestones realistically over time until ${profile.passoutYear}
+- Each milestone MUST include:
+  - exact platform (Coursera/NPTEL/Kaggle/etc)
+  - exact measurable output
+  - deadline within 2–6 weeks range
+- Spread milestones realistically over time until ${parsedProfile.passoutYear}
 - Focus on outcomes that improve job or masters chances
 - For skill gaps: name the exact skill, why it matters for their specific dream target, and suggest one free resource (preferably NPTEL or YouTube).
 - Give a frank, honest recommendation first (Masters or Placements) with 2-3 specific reasons based on THIS student's actual profile. Do not be generic.
 - Categories must be one of: technical, project, career, soft, exam, application
 
-PROFILE:
-    ${JSON.stringify(profile)}
 
-Return ONLY valid JSON in this exact format, no other text:
+Return ONLY this JSON, no markdown, no backticks, no explanation:
 {
-  "recommendation": "Masters" | "Placements" | "Unclear",
-  "reasoning": "2-3 lines specific to THIS student",
+  "recommendation": "Masters",
+  "reasoning": "2-3 sentences specific to this student",
   "milestones": [
     {
-      "milestone_title": "Specific action (e.g. Build a CNN-based image classifier using TensorFlow)",
-      "description": "Explain exactly what to do and why it matters",
-      "due_date": "YYYY-MM-DD",
+      "milestone_title": "Complete DSA fundamentals on NPTEL",
+      "description": "Focus on arrays, trees, graphs. Required for product company interviews.",
+      "due_date": "2025-09-01",
       "category": "technical",
       "status": "pending",
       "version": 1
@@ -73,59 +119,126 @@ Return ONLY valid JSON in this exact format, no other text:
   ]
 }`
 
-    const result = await model.generateContent(prompt)
-    const text = result.response.text()
+    async function callGeminiWithRetry(model, prompt, retries = 3) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const result = await model.generateContent(prompt)
+          return result.response.text()
+        } catch (err) {
+          console.log(`Gemini attempt ${i + 1} failed`)
 
-    console.log("GEMINI RAW:", text)
+          if (i === retries - 1) throw err
 
-    const jsonStart = text.indexOf('{')
-    const jsonEnd = text.lastIndexOf('}') + 1
-    const parsed = JSON.parse(text.slice(jsonStart, jsonEnd))
+          // wait before retry (1s, 2s, 3s)
+          await new Promise(res => setTimeout(res, 1000 * (i + 1)))
+          console.log("Gemini raw response (first 200 chars):", text.slice(0, 200))
+          
+        }
+      }
+    }
+    
+    const text = await callGeminiWithRetry(model, prompt)
 
+    // Parse JSON — strip any markdown backticks if present
+    const cleaned = text
+      .replace(/```json/g, '')
+      .replace(/```/g, '')
+      .trim()
+
+    const jsonStart = cleaned.indexOf('{')
+    const jsonEnd = cleaned.lastIndexOf('}') + 1
+
+    if (jsonStart === -1 || jsonEnd === 0) {
+      throw new Error("Gemini did not return valid JSON. Raw: " + text.slice(0, 300))
+    }
+
+    const parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd))
+    console.log("Parsed recommendation:", parsed.recommendation)
+    console.log("Number of milestones:", parsed.milestones?.length)
+
+    // Update user's chosen path
     await supabase
-      .from('Users')
+      .from('users')
       .update({ chosen_path: parsed.recommendation })
       .eq('id', userId)
 
+    // Delete old roadmap and insert new one
+    
+
+    const allowedCategories = ['technical', 'project', 'career', 'soft', 'exam', 'application']
+
+    const milestones = parsed.milestones.map(m => {
+      let category = (m.category || '').toLowerCase().trim()
+
+      // Normalize AI output
+      if (category.includes('tech')) category = 'technical'
+      else if (category.includes('proj')) category = 'project'
+      else if (category.includes('career')) category = 'career'
+      else if (category.includes('soft')) category = 'soft'
+      else if (category.includes('exam')) category = 'exam'
+      else if (category.includes('apply')) category = 'application'
+
+      // Final safety fallback
+      if (!allowedCategories.includes(category)) {
+        category = 'technical'
+      }
+
+      return {
+        milestone_title: m.milestone_title,
+        description: m.description,
+        due_date: m.due_date,
+        category,
+        status: 'pending',
+        version: 1,
+        user_id: userId
+      }
+    })
     await supabase.from('roadmap').delete().eq('user_id', userId)
+    const { error: insertError } = await supabase.from('roadmap').insert(milestones)
 
-    const milestones = parsed.milestones.map(m => ({
-      ...m,
-      user_id: userId
-    }))
+    
 
-    await supabase.from('roadmap').insert(milestones)
-
-    return Response.json({ success: true })
-
-  } catch (error) {
-    console.error("GEMINI ERROR:", error)
-    await supabase.from('roadmap').insert([
-    {
-      user_id: userId,
-      milestone_title: "Fallback milestone",
-      description: "AI failed, but system is working",
-      due_date: "2026-01-01",
-      category: "technical",
-      status: "pending",
-      version: 1
+    if (insertError) {
+      console.error("Roadmap insert error:", JSON.stringify(insertError))
+      throw new Error("Failed to save roadmap: " + insertError.message)
     }
-  ])
+
+    console.log("=== ROADMAP SAVED SUCCESSFULLY ===")
+
     return Response.json({
       success: true,
-      fallback: true,
-      recommendation: "Unclear",
-      reasoning: "AI failed, showing default roadmap",
-      milestones: [
-        {
-          milestone_title: "Build 2 projects",
-          description: "Focus on practical work",
-          due_date: "2026-12-01",
-          category: "project",
-          status: "pending",
-          version: 1
-        }
-      ]
+      recommendation: parsed.recommendation,
+      reasoning: parsed.reasoning
     })
+
+  } catch (error) {
+    console.error("=== ROUTE ERROR ===")
+    console.error("Error message:", error.message)
+    console.error("userId at time of error:", userId)
+
+    // Try fallback insert if we have a userId
+    if (userId) {
+      console.log("Attempting fallback insert...")
+      const { error: fallbackError } = await supabase.from('roadmap').insert([{
+        user_id: userId,
+        milestone_title: "Start your journey",
+        description: "Auron is setting up your personalised roadmap. Check back shortly.",
+        due_date: "2026-06-01",
+        category: "career",
+        status: "pending",
+        version: 1
+      }])
+
+      if (fallbackError) {
+        console.error("Fallback also failed:", JSON.stringify(fallbackError))
+      } else {
+        console.log("Fallback milestone inserted successfully")
+      }
+    }
+
+    return Response.json({
+      success: false,
+      error: error.message
+    }, { status: 500 })
   }
 }
