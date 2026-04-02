@@ -78,23 +78,24 @@ export default function Login() {
         ) : (
           <>
             <button
-              onClick={handleGoogle}
-              style={{
-                width: '100%',
-                padding: '13px',
-                border: '1px solid #DDD',
-                borderRadius: '10px',
-                background: 'white',
-                fontSize: '15px',
-                cursor: 'pointer',
-                fontFamily: 'Georgia, serif',
-                marginBottom: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px'
-              }}>
-              <span>G</span> Continue with Google
+            onClick={handleGoogle}
+            style={{
+              width: '100%',
+              padding: '13px',
+              border: '1px solid #DDD',
+              borderRadius: '10px',
+              background: 'white',
+              fontSize: '15px',
+              cursor: 'pointer',
+              fontFamily: 'Georgia, serif',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              color: '#3D1F00' 
+            }}>
+              <span style={{ color: '#3D1F00', fontWeight: 'bold' }}>G</span>Continue with Google
             </button>
 
             <div style={{
@@ -104,7 +105,7 @@ export default function Login() {
               marginBottom: '20px'
             }}>
               <div style={{ flex: 1, height: '1px', background: '#EEE' }} />
-              <span style={{ color: '#AAA', fontSize: '13px' }}>or</span>
+              <span style={{ color: '#8B6A50', fontSize: '13px' }}>or</span>
               <div style={{ flex: 1, height: '1px', background: '#EEE' }} />
             </div>
 
@@ -124,7 +125,8 @@ export default function Login() {
                   fontFamily: 'Georgia, serif',
                   marginBottom: '14px',
                   boxSizing: 'border-box',
-                  outline: 'none'
+                  outline: 'none',
+                  color: '#3D1F00'
                 }}
               />
               <button

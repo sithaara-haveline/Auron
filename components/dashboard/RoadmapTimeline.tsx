@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { groupBySemester } from '@/lib/roadmap'
+import { groupBySemester } from "@/app/lib/roadmap"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,6 +18,8 @@ export default function RoadmapTimeline() {
 
   async function load() {
     const { data: user } = await supabase.auth.getUser()
+
+    if (!user?.user?.id) return
 
     const { data: milestones } = await supabase
       .from('roadmap')
