@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { groupBySemester } from "@/app/lib/roadmap"
+import { groupBySemester } from "@/lib/roadmap"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
