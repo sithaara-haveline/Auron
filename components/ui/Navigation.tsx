@@ -1,7 +1,11 @@
 'use client'
+import { motion } from 'motion/react'
+import { useState, useEffect } from 'react'
 
-import { motion } from 'framer-motion'
-import { useEffect, useState } from 'react'
+const scrollToOnboarding = () => {
+  const element = document.getElementById('onboarding-section')
+  if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 export default function Navigation() {
   const [scrolled, setScrolled] = useState(false)

@@ -1,25 +1,86 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
+  --background: #f7f5f0;
+  --foreground: #65350f;
+  --card: #ffffff;
+  --card-foreground: #65350f;
+  --card-border: #ede9e3;
+  --primary: #65350f;
+  --primary-foreground: #ffffff;
+  --muted-foreground: #9a9690;
+  --border: #ede9e3;
+
+  /* Auron specific */
+  --color-caramel: #65350f;
+  --color-gingerbread: #5c2c04;
+  --color-sage-green: #7aab8a;
+  --color-warm-greige: #9a9690;
+  --color-orb-cream: #f0ece3;
+  --color-orb-tawny: #80471c;
   --color-background: #f7f5f0;
   --color-foreground: #65350f;
   --color-card: #ffffff;
   --color-card-border: #ede9e3;
-  --color-caramel: #65350f;
-  --color-sage-green: #7aab8a;
-  --color-warm-greige: #9a9690;
   --color-sidebar: #ffffff;
   --color-sidebar-border: #ede9e3;
   --color-sidebar-accent: #f7f5f0;
 }
 
-body {
-  background: var(--color-background);
-  color: var(--color-foreground);
-  font-family: 'Plus Jakarta Sans', sans-serif;
-}
-input::placeholder {
-  color: #8B6A50; /* matches your theme */
-  opacity: 1;
-}
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
 
+  input[type='range'] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    background: transparent;
+    outline: none;
+  }
+
+  /* Track styling for Chrome/Safari */
+  input[type='range']::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px;
+    background: #ede9e3;
+    border-radius: 3px;
+    outline: none;
+  }
+
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--color-caramel);
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-top: -6px;
+  }
+
+  /* Track styling for Firefox */
+  input[type='range']::-moz-range-track {
+    background: #ede9e3;
+    border-radius: 3px;
+    height: 6px;
+  }
+
+  input[type='range']::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--color-caramel);
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+}

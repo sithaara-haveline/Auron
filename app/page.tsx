@@ -1,15 +1,23 @@
 'use client'
-import { useState } from 'react'
+import { useState, FormEvent, ChangeEvent } from 'react'
+import FeatureCards from '@/components/ui/FeatureCards'
+import ProblemSection from '@/components/ui/ProblemSection'
+
+interface FormData {
+  name: string
+  college: string
+  cgpa: string
+}
 
 export default function Home() {
-  const [showForm, setShowForm] = useState(false)
-  const [formData, setFormData] = useState({
+  const [showForm, setShowForm] = useState<boolean>(false)
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     college: '',
     cgpa: ''
   })
 
-  function handleScroll() {
+  const handleScroll = (): void => {
     setShowForm(true)
     setTimeout(() => {
       document.getElementById('quick-form')?.scrollIntoView({ 
@@ -18,11 +26,12 @@ export default function Home() {
     }, 100)
   }
 
-  function handleChange(e) {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+  const handleChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const { name, value } = e.currentTarget
+    setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  function handleContinue(e) {
+  const handleContinue = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault()
     // Save to localStorage temporarily, then go to login
     localStorage.setItem('auron_temp', JSON.stringify(formData))
@@ -155,9 +164,9 @@ export default function Home() {
             
             <form onSubmit={handleContinue}>
               {[
-                { label: 'Your name', name: 'name', type: 'text', placeholder: 'e.g. Sithaara' },
-                { label: 'College / University', name: 'college', type: 'text', placeholder: 'e.g. RSET, Kochi' },
-                { label: 'Current CGPA', name: 'cgpa', type: 'number', placeholder: 'e.g. 7.8' }
+                { label: 'Your name', name: 'name' as const, type: 'text', placeholder: 'e.g. Sithaara' },
+                { label: 'College / University', name: 'college' as const, type: 'text', placeholder: 'e.g. RSET, Kochi' },
+                { label: 'Current CGPA', name: 'cgpa' as const, type: 'number', placeholder: 'e.g. 7.8' }
               ].map(field => (
                 <div key={field.name} style={{ marginBottom: '20px' }}>
                   <label style={{
@@ -209,6 +218,43 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* PROBLEM SECTION */}
+      <ProblemSection />
+
+      {/* FEATURE CARDS */}
+      <FeatureCards />
+
+      {/* CTA FOOTER */}
+      <div style={{
+        background: '#3D1F00',
+        color: 'white',
+        padding: '60px 40px',
+        textAlign: 'center',
+        marginTop: '40px'
+      }}>
+        <h2 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '16px' }}>
+          Ready to build your roadmap?
+        </h2>
+        <p style={{ fontSize: '16px', marginBottom: '32px', opacity: 0.9 }}>
+          Start today. It takes just 5 minutes.
+        </p>
+        <button
+          onClick={handleScroll}
+          style={{
+            background: 'white',
+            color: '#3D1F00',
+            border: 'none',
+            padding: '14px 32px',
+            borderRadius: '10px',
+            fontSize: '16px',
+            cursor: 'pointer',
+            fontFamily: 'Georgia, serif',
+            fontWeight: 'bold'
+          }}>
+          Get started free
+        </button>
+      </div>
     </main>
   )
 }

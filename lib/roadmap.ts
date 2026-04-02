@@ -1,5 +1,12 @@
-export function groupBySemester(milestones: any[]) {
-  const grouped: any = {}
+import { Milestone } from './types'
+
+export interface SemesterGroup {
+  semester: string
+  milestones: Milestone[]
+}
+
+export function groupBySemester(milestones: Milestone[]): SemesterGroup[] {
+  const grouped: Record<string, Milestone[]> = {}
 
   milestones.forEach((m) => {
     const date = new Date(m.due_date)

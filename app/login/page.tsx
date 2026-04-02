@@ -1,25 +1,27 @@
 'use client'
-import { useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { useState, FormEvent, ChangeEvent } from 'react'
+import { supabase } from '@/lib/supabase'
 
 export default function Login() {
-  const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState<string>('')
+  const [sent, setSent] = useState<boolean>(false)
+  const [loading, setLoading] = useState<boolean>(false)
+  const [error, setError] = useState<string>('')
 
-  async function handleLogin(e) {
+  async function handleLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
+    setError('')
     
     const { error } = await supabase.auth.signInWithOtp({
       email: email,
       options: {
-        emailRedirectTo: 'http://localhost:3000/onboarding'
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/onboarding`
       }
     })
     
     if (error) {
-      alert('Something went wrong: ' + error.message)
+      setError('Something went wrong: ' + error.message)
     } else {
       setSent(true)
     }
@@ -30,7 +32,7 @@ export default function Login() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: 'http://localhost:3000/onboarding'
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/onboarding`
       }
     })
   }
@@ -78,23 +80,23 @@ export default function Login() {
         ) : (
           <>
             <button
-            onClick={handleGoogle}
-            style={{
-              width: '100%',
-              padding: '13px',
-              border: '1px solid #DDD',
-              borderRadius: '10px',
-              background: 'white',
-              fontSize: '15px',
-              cursor: 'pointer',
-              fontFamily: 'Georgia, serif',
-              marginBottom: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              color: '#3D1F00' 
-            }}>
+              onClick={handleGoogle}
+              style={{
+                width: '100%',
+                padding: '13px',
+                border: '1px solid #DDD',
+                borderRadius: '10px',
+                background: 'white',
+                fontSize: '15px',
+                cursor: 'pointer',
+                fontFamily: 'Georgia, serif',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                color: '#3D1F00' 
+              }}>
               <span style={{ color: '#3D1F00', fontWeight: 'bold' }}>G</span>Continue with Google
             </button>
 
@@ -114,7 +116,7 @@ export default function Login() {
                 type="email"
                 placeholder="your@email.com"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                 required
                 style={{
                   width: '100%',
@@ -129,18 +131,30 @@ export default function Login() {
                   color: '#3D1F00'
                 }}
               />
+              {error && (
+                <div style={{
+                  background: '#fee',
+                  color: '#c33',
+                  padding: '10px 12px',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  marginBottom: '14px'
+                }}>
+                  {error}
+                </div>
+              )}
               <button
                 type="submit"
                 disabled={loading}
                 style={{
                   width: '100%',
-                  background: '#3D1F00',
+                  background: loading ? '#8B6A50' : '#3D1F00',
                   color: 'white',
                   border: 'none',
                   padding: '13px',
                   borderRadius: '10px',
                   fontSize: '15px',
-                  cursor: 'pointer',
+                  cursor: loading ? 'not-allowed' : 'pointer',
                   fontFamily: 'Georgia, serif'
                 }}>
                 {loading ? 'Sending...' : 'Send magic link →'}

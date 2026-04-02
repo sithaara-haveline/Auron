@@ -1,24 +1,56 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { useState, useEffect, ReactNode, ChangeEvent, FormEvent } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
-// ─── TYPEWRITER COMPONENT ───────────────────────────────────────
-function Typewriter({ onDone }) {
-  const [display, setDisplay] = useState('')
-  const [phase, setPhase] = useState('typing1')
-  const [name, setName] = useState('there')
+// ─── TYPES ──────────────────────────────────────────────────────
+interface Profile {
+  name: string
+  college: string
+  cgpa: string
+  branch: string
+  semester: string
+  passoutMonth: string
+  passoutYear: string
+  tier: string
+  skills: Record<string, number>
+  dreamFuture: string
+  dreamTarget: string
+  priority: string
+  abroad: string
+  funding: string
+  reminderEmail: string
+  reminderFreq: string
+}
 
-useEffect(() => {
-  const stored = JSON.parse(localStorage.getItem('auron_temp') || '{}')
-  if (stored.name) setName(stored.name)
-}, [])
+interface TypewriterProps {
+  onDone: () => void
+}
+
+interface StepProps {
+  data: Profile
+  onChange: (key: keyof Profile, value: any) => void
+  onNext: () => void
+  onBack?: () => void
+}
+
+// ─── TYPEWRITER COMPONENT ───────────────────────────────────────
+function Typewriter({ onDone }: TypewriterProps) {
+  const [display, setDisplay] = useState<string>('')
+  const [phase, setPhase] = useState<string>('typing1')
+  const [name, setName] = useState<string>('there')
+
+  useEffect(() => {
+    const stored = JSON.parse(localStorage.getItem('auron_temp') || '{}')
+    if (stored.name) setName(stored.name)
+  }, [])
 
   const line1 = `Hi, ${name}!`
   const line2 = "Let's figure out what your dream future looks like."
 
   useEffect(() => {
-    let timeout
+    let timeout: NodeJS.Timeout
 
     if (phase === 'typing1') {
       if (display.length < line1.length) {
@@ -28,13 +60,9 @@ useEffect(() => {
       } else {
         timeout = setTimeout(() => setPhase('pause1'), 1200)
       }
-    }
-
-    if (phase === 'pause1') {
-      timeout = setTimeout(() => setPhase('erasing'), 300)
-    }
-
-    if (phase === 'erasing') {
+    } else if (phase === 'pause1') {
+      timeout = setTimeout(() => setPhase('erasing1'), 300)
+    } else if (phase === 'erasing1') {
       if (display.length > 0) {
         timeout = setTimeout(() => {
           setDisplay(display.slice(0, -1))
@@ -42,24 +70,30 @@ useEffect(() => {
       } else {
         timeout = setTimeout(() => setPhase('typing2'), 300)
       }
-    }
-
-    if (phase === 'typing2') {
+    } else if (phase === 'typing2') {
       if (display.length < line2.length) {
         timeout = setTimeout(() => {
           setDisplay(line2.slice(0, display.length + 1))
         }, 45)
       } else {
-        timeout = setTimeout(() => setPhase('done'), 600)
+        timeout = setTimeout(() => setPhase('pause2'), 600)
       }
-    }
-
-    if (phase === 'done') {
+    } else if (phase === 'pause2') {
+      timeout = setTimeout(() => setPhase('erasing2'), 300)
+    } else if (phase === 'erasing2') {
+      if (display.length > 0) {
+        timeout = setTimeout(() => {
+          setDisplay(display.slice(0, -1))
+        }, 30)
+      } else {
+        timeout = setTimeout(() => setPhase('done'), 300)
+      }
+    } else if (phase === 'done') {
       onDone()
     }
 
     return () => clearTimeout(timeout)
-  }, [display, phase])
+  }, [display, phase, onDone, line1, line2])
 
   return (
     <div style={{
@@ -95,16 +129,16 @@ useEffect(() => {
   )
 }
 
-// ─── STYLES (reused everywhere) ──────────────────────────────────
+// ─── STYLES ──────────────────────────────────────────────────────
 const S = {
   page: {
     minHeight: '100vh',
     background: '#F5F0E8',
     fontFamily: 'Georgia, serif',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
+    display: 'flex' as const,
+    flexDirection: 'column' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     padding: '40px 20px'
   },
   card: {
@@ -116,12 +150,12 @@ const S = {
     boxShadow: '0 4px 24px hsla(0, 0%, 0%, 0.08)'
   },
   label: {
-    display: 'block',
+    display: 'block' as const,
     fontSize: '12px',
     color: '#8B6A50',
     marginBottom: '6px',
     letterSpacing: '0.5px',
-    textTransform: 'uppercase'
+    textTransform: 'uppercase' as const
   },
   input: {
     width: '100%',
@@ -131,7 +165,7 @@ const S = {
     fontSize: '15px',
     fontFamily: 'Georgia, serif',
     outline: 'none',
-    boxSizing: 'border-box',
+    boxSizing: 'border-box' as const,
     marginBottom: '20px',
     color: '#3d1f00'     
   },
@@ -143,7 +177,7 @@ const S = {
     fontSize: '15px',
     fontFamily: 'Georgia, serif',
     outline: 'none',
-    boxSizing: 'border-box',
+    boxSizing: 'border-box' as const,
     marginBottom: '20px',
     background: 'white',
     color: '#3d1f00'
@@ -185,14 +219,14 @@ const S = {
     lineHeight: '1.6'
   },
   progress: {
-    display: 'flex',
+    display: 'flex' as const,
     gap: '6px',
     marginBottom: '32px'
   }
 }
 
 // ─── PROGRESS BAR ────────────────────────────────────────────────
-function Progress({ step, total }) {
+function Progress({ step, total }: { step: number; total: number }) {
   return (
     <div style={S.progress}>
       {Array.from({ length: total }).map((_, i) => (
@@ -209,7 +243,7 @@ function Progress({ step, total }) {
 }
 
 // ─── STEP 1: ACADEMIC PROFILE ────────────────────────────────────
-function StepAcademic({ data, onChange, onNext }) {
+function StepAcademic({ data, onChange, onNext }: StepProps) {
   return (
     <div style={S.page}>
       <div style={S.card}>
@@ -313,10 +347,10 @@ const SKILL_OPTIONS = [
   'Research', 'Statistics & Math'
 ]
 
-function StepSkills({ data, onChange, onNext, onBack }) {
-  const [selected, setSelected] = useState(data.skills || {})
+function StepSkills({ data, onChange, onNext, onBack }: StepProps) {
+  const [selected, setSelected] = useState<Record<string, number>>(data.skills || {})
 
-  function toggleSkill(skill) {
+  const toggleSkill = (skill: string): void => {
     const updated = { ...selected }
     if (updated[skill]) {
       delete updated[skill]
@@ -327,7 +361,7 @@ function StepSkills({ data, onChange, onNext, onBack }) {
     onChange('skills', updated)
   }
 
-  function setConfidence(skill, val) {
+  const setConfidence = (skill: string, val: string): void => {
     const updated = { ...selected, [skill]: parseInt(val) }
     setSelected(updated)
     onChange('skills', updated)
@@ -386,7 +420,7 @@ function StepSkills({ data, onChange, onNext, onBack }) {
                   max="5"
                   value={selected[skill]}
                   onChange={e => setConfidence(skill, e.target.value)}
-                  style={{ width: '100%', accentColor: '#3D1F00' }}
+                  style={{ width: '100%', accentColor: '#3D1F00' } as React.CSSProperties}
                 />
                 <div style={{
                   display: 'flex',
@@ -419,7 +453,7 @@ function StepSkills({ data, onChange, onNext, onBack }) {
 }
 
 // ─── STEP 3: DREAM FUTURE ────────────────────────────────────────
-function StepDream({ data, onChange, onNext, onBack }) {
+function StepDream({ data, onChange, onNext, onBack }: StepProps) {
   return (
     <div style={S.page}>
       <div style={S.card}>
@@ -434,7 +468,7 @@ function StepDream({ data, onChange, onNext, onBack }) {
           style={{
             ...S.input,
             minHeight: '90px',
-            resize: 'vertical',
+            resize: 'vertical' as const,
             lineHeight: '1.6'
           }}
           placeholder="e.g. Building AI products at a top tech company, or doing research at a great university, or starting my own company..."
@@ -463,7 +497,7 @@ function StepDream({ data, onChange, onNext, onBack }) {
                 border: data.priority === opt ? '2px solid #3D1F00' : '1px solid #DDD',
                 background: data.priority === opt ? '#F5F0E8' : 'white',
                 cursor: 'pointer',
-                textAlign: 'center',
+                textAlign: 'center' as const,
                 fontSize: '13px',
                 color: data.priority === opt ? '#3D1F00' : '#666',
                 fontWeight: data.priority === opt ? 'bold' : 'normal',
@@ -487,7 +521,7 @@ function StepDream({ data, onChange, onNext, onBack }) {
                 border: data.abroad === opt ? '2px solid #3D1F00' : '1px solid #DDD',
                 background: data.abroad === opt ? '#F5F0E8' : 'white',
                 cursor: 'pointer',
-                textAlign: 'center',
+                textAlign: 'center' as const,
                 fontSize: '13px',
                 color: data.abroad === opt ? '#3D1F00' : '#666',
                 fontWeight: data.abroad === opt ? 'bold' : 'normal',
@@ -526,7 +560,7 @@ function StepDream({ data, onChange, onNext, onBack }) {
 }
 
 // ─── STEP 4: EMAIL FOR REMINDERS ─────────────────────────────────
-function StepReminders({ data, onChange, onNext, onBack }) {
+function StepReminders({ data, onChange, onNext, onBack }: StepProps) {
   return (
     <div style={S.page}>
       <div style={S.card}>
@@ -601,14 +635,33 @@ function StepGenerating() {
     'Building your personalised roadmap...',
     'Almost there...'
   ]
-  const [msgIndex, setMsgIndex] = useState(0)
+  const [msgIndex, setMsgIndex] = useState<number>(0)
+  const [showFeatures, setShowFeatures] = useState(false)
 
+  // Rotate messages every 2 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       setMsgIndex(i => (i + 1) % messages.length)
     }, 2000)
     return () => clearInterval(interval)
   }, [])
+
+  // Show features after 7 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowFeatures(true)
+    }, 7000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const features = [
+    { icon: '🗺️', title: 'Personalized Roadmap', desc: 'Tailored to your skills & goals' },
+    { icon: '📊', title: 'Skill Gap Analysis', desc: 'Know exactly what to improve' },
+    { icon: '💼', title: 'Industry Insights', desc: 'What companies actually want' },
+    { icon: '🎓', title: 'Smart Recommendations', desc: 'Courses, projects & resources' },
+    { icon: '🚀', title: 'Career Milestones', desc: 'Clear path to your dream' },
+    { icon: '💡', title: 'AI-Powered Advice', desc: 'Real guidance, real results' }
+  ]
 
   return (
     <div style={{
@@ -618,98 +671,138 @@ function StepGenerating() {
       alignItems: 'center',
       justifyContent: 'center',
       fontFamily: 'Georgia, serif',
-      flexDirection: 'column',
-      gap: '24px'
+      padding: '40px 20px'
     }}>
-      <div style={{
-        width: '48px',
-        height: '48px',
-        border: '3px solid #DDD',
-        borderTop: '3px solid #3D1F00',
-        borderRadius: '50%',
-        animation: 'spin 1s linear infinite'
-      }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      <p style={{ color: '#3D1F00', fontSize: '18px', textAlign: 'center' }}>
-        {messages[msgIndex]}
-      </p>
+      {/* Left side - Loading spinner */}
+      <div style={{ flex: showFeatures ? 0.5 : 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          border: '3px solid #DDD',
+          borderTop: '3px solid #3D1F00',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <p style={{ color: '#3D1F00', fontSize: '18px', textAlign: 'center', fontWeight: 600 }}>
+          {messages[msgIndex]}
+        </p>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: showFeatures ? 1 : 0 }}
+          transition={{ delay: 0.3 }}
+          style={{ color: '#8B6A50', fontSize: '14px', textAlign: 'center', fontStyle: 'italic' }}
+        >
+          Seems like Auron is thinking quite seriously about your future...
+        </motion.p>
+      </div>
+
+      {/* Right side - Features list (appears after 7 seconds) */}
+      {showFeatures && (
+        <div style={{ flex: 0.5, paddingLeft: '40px' }}>
+          <div style={{ display: 'grid', gap: '16px' }}>
+            {features.map((feature, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.12 }}
+                style={{
+                  padding: '16px',
+                  background: 'white',
+                  borderRadius: '12px',
+                  border: '1px solid #ede9e3',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <span style={{ fontSize: '24px' }}>{feature.icon}</span>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#3D1F00', marginBottom: '4px' }}>
+                      {feature.title}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#8B6A50' }}>
+                      {feature.desc}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+  
+
 
 // ─── MAIN ONBOARDING ORCHESTRATOR ────────────────────────────────
 export default function Onboarding() {
   const router = useRouter()
-  const [phase, setPhase] = useState('typewriter')
-  const [step, setStep] = useState(0)
-  const [generating, setGenerating] = useState(false)
+  const [phase, setPhase] = useState<string>('typewriter')
+  const [step, setStep] = useState<number>(0)
+  const [generating, setGenerating] = useState<boolean>(false)
 
   const tempData = typeof window !== 'undefined'
     ? JSON.parse(localStorage.getItem('auron_temp') || '{}')
     : {}
 
-  const [profile, setProfile] = useState({
-    // From landing page
+  const [profile, setProfile] = useState<Profile>({
     name: tempData.name || '',
     college: tempData.college || '',
     cgpa: tempData.cgpa || '',
-    // Academic step
     branch: '',
     semester: '',
     passoutMonth: '',
     passoutYear: '',
     tier: '',
-    // Skills step
     skills: {},
-    // Dream step
     dreamFuture: '',
     dreamTarget: '',
     priority: '',
     abroad: '',
     funding: '',
-    // Reminders step
     reminderEmail: '',
     reminderFreq: ''
   })
 
-  function update(key, val) {
+  const update = (key: keyof Profile, val: any): void => {
     setProfile(prev => ({ ...prev, [key]: val }))
   }
 
-  async function handleFinish() {
+  const handleFinish = async (): Promise<void> => {
     setGenerating(true)
 
     try {
       // 1. Get current logged-in user from Supabase Auth
       const { data: { user } } = await supabase.auth.getUser()
 
-// If no logged in user, use email from form as fallback for testing
-const userEmail = user?.email || profile.reminderEmail
-const userId = user?.id || crypto.randomUUID()
+      const userEmail = user?.email || profile.reminderEmail
+      const userId = user?.id || crypto.randomUUID()
 
-const { data: savedUser, error: userError } = await supabase
-  .from('users')
-  .upsert({
-    id: userId,
-    email: userEmail,
-    name: profile.name,
-    college: profile.college,
-    branch: profile.branch,
-    cgpa: parseFloat(profile.cgpa),
-    passout_date: `${profile.passoutYear}-05-01`,
-    chosen_path: 'pending'
-  })
-  .select()
-  .single()
+      const { data: savedUser, error: userError } = await supabase
+        .from('users')
+        .upsert({
+          id: userId,
+          email: userEmail,
+          name: profile.name,
+          college: profile.college,
+          branch: profile.branch,
+          cgpa: parseFloat(profile.cgpa),
+          passout_date: `${profile.passoutYear}-05-01`,
+          chosen_path: 'pending'
+        })
+        .select()
+        .single()
 
-if (userError) {
-  console.error('User save error FULL:', JSON.stringify(userError, null, 2))
-  throw userError
-}
-
+      if (userError) {
+        console.error('User save error:', userError)
+        throw userError
+      }
 
       // 3. Save skills to user_skills table
-      const skillInserts = Object.entries(profile.skills).map(([skillName, confidence]) => ({
+      const skillInserts = Object.entries(profile.skills).map(([skillName, confidence]: [string, number]) => ({
         user_id: userId,
         skill_name: skillName,
         confidence: confidence
@@ -743,7 +836,7 @@ if (userError) {
       })
 
       if (!response.ok) {
-        console.error('API failed, continuing with fallback')
+        console.error('API failed, message:', response.statusText)
       }
 
       // 5. Clear temp data and go to dashboard
@@ -763,7 +856,7 @@ if (userError) {
     return <Typewriter onDone={() => setPhase('steps')} />
   }
 
-  const steps = [
+  const steps: ReactNode[] = [
     <StepAcademic
       key="academic"
       data={profile}
@@ -793,5 +886,17 @@ if (userError) {
     />
   ]
 
-  return steps[step]
-} 
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={step}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        transition={{ duration: 0.5 }}
+      >
+        {steps[step]}
+      </motion.div>
+    </AnimatePresence>
+  )
+}

@@ -1,49 +1,65 @@
-import { GoogleGenerativeAI } from "@google/generative-ai"
-import { createClient } from "@supabase/supabase-js"
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import { createClient } from '@supabase/supabase-js'
+import { NextRequest, NextResponse } from 'next/server'
+import type { OnboardingProfile, Milestone } from '@/lib/types'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '')
 
-const model = genAI.getGenerativeModel({
-  model: "models/gemini-2.5-flash"
-})
+const model = genAI.getGenerativeModel({model: 'models/gemini-2.5-flash'})
 
 // Use service role key for server-side operations
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 )
 
-export async function POST(request) {
-  // userId declared here so catch block can access it
-  let userId = null
-  let parsedProfile = null
+interface RoadmapGenerationBody {
+  userId: string
+  profile: OnboardingProfile
+}
+
+interface GeminiResponse {
+  recommendation: string
+  reasoning: string
+  milestones: Array<{
+    milestone_title: string
+    description: string
+    due_date: string
+    category: string
+    status: string
+    version: number
+  }>
+}
+
+export async function POST(request: NextRequest) {
+  let userId: string | null = null
+  let parsedProfile: OnboardingProfile | null = null
 
   try {
-    // FIXED: use let/destructure separately so userId stays in outer scope
-    const body = await request.json()
+    const body = (await request.json()) as RoadmapGenerationBody
     userId = body.userId
     parsedProfile = body.profile
 
-    console.log("=== ROADMAP GENERATION START ===")
-    console.log("userId:", userId)
-    console.log("profile name:", parsedProfile?.name)
+    console.log('=== ROADMAP GENERATION START ===')
+    console.log('userId:', userId)
+    console.log('profile name:', parsedProfile?.name)
 
     if (!userId) {
-      throw new Error("No userId provided in request body")
+      throw new Error('No userId provided in request body')
     }
 
     // Build skill summary
     const skillSummary = Object.entries(parsedProfile.skills || {})
       .map(([skill, confidence]) => {
         const labels = ['', 'heard of it', 'basics only', 'can use it', 'comfortable', 'can teach it']
-        return `${skill}: ${labels[confidence] || confidence}`
+        return `${skill}: ${labels[confidence as number] || confidence}`
       })
       .join(', ') || 'No skills listed'
 
-    console.log("skillSummary:", skillSummary)
+    console.log('skillSummary:', skillSummary)
 
     // Save/update user in DB first (before AI call)
-    console.log("Saving user to DB...")
+    console.log('Saving user to DB...')
     const { data: savedUser, error: userError } = await supabase
       .from('users')
       .upsert({
@@ -59,14 +75,14 @@ export async function POST(request) {
       .single()
 
     if (userError) {
-      console.error("User save error details:", JSON.stringify(userError))
+      console.error('User save error details:', JSON.stringify(userError))
       // Don't throw — continue even if user save fails
     } else {
-      console.log("User saved successfully:", savedUser?.id)
+      console.log('User saved successfully:', savedUser?.id)
     }
 
     // Call Gemini
-    console.log("Calling Gemini...")
+    console.log('Calling Gemini...')
 
     const prompt = `You are Auron, an AI career advisor for Indian engineering students.
 
@@ -119,7 +135,11 @@ Return ONLY this JSON, no markdown, no backticks, no explanation:
   ]
 }`
 
-    async function callGeminiWithRetry(model, prompt, retries = 3) {
+    async function callGeminiWithRetry(
+      model: any,
+      prompt: string,
+      retries: number = 3
+    ): Promise<string> {
       for (let i = 0; i < retries; i++) {
         try {
           const result = await model.generateContent(prompt)
@@ -131,13 +151,13 @@ Return ONLY this JSON, no markdown, no backticks, no explanation:
 
           // wait before retry (1s, 2s, 3s)
           await new Promise(res => setTimeout(res, 1000 * (i + 1)))
-          console.log("Gemini raw response (first 200 chars):", text.slice(0, 200))
-          
         }
       }
+      throw new Error('All Gemini retries failed')
     }
-    
+
     const text = await callGeminiWithRetry(model, prompt)
+    console.log('Gemini raw response (first 200 chars):', text.slice(0, 200))
 
     // Parse JSON — strip any markdown backticks if present
     const cleaned = text
@@ -149,12 +169,12 @@ Return ONLY this JSON, no markdown, no backticks, no explanation:
     const jsonEnd = cleaned.lastIndexOf('}') + 1
 
     if (jsonStart === -1 || jsonEnd === 0) {
-      throw new Error("Gemini did not return valid JSON. Raw: " + text.slice(0, 300))
+      throw new Error('Gemini did not return valid JSON. Raw: ' + text.slice(0, 300))
     }
 
-    const parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd))
-    console.log("Parsed recommendation:", parsed.recommendation)
-    console.log("Number of milestones:", parsed.milestones?.length)
+    const parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd)) as GeminiResponse
+    console.log('Parsed recommendation:', parsed.recommendation)
+    console.log('Number of milestones:', parsed.milestones?.length)
 
     // Update user's chosen path
     await supabase
@@ -163,8 +183,6 @@ Return ONLY this JSON, no markdown, no backticks, no explanation:
       .eq('id', userId)
 
     // Delete old roadmap and insert new one
-    
-
     const allowedCategories = ['technical', 'project', 'career', 'soft', 'exam', 'application']
 
     const milestones = parsed.milestones.map(m => {
@@ -193,52 +211,51 @@ Return ONLY this JSON, no markdown, no backticks, no explanation:
         user_id: userId
       }
     })
+
     await supabase.from('roadmap').delete().eq('user_id', userId)
     const { error: insertError } = await supabase.from('roadmap').insert(milestones)
 
-    
-
     if (insertError) {
-      console.error("Roadmap insert error:", JSON.stringify(insertError))
-      throw new Error("Failed to save roadmap: " + insertError.message)
+      console.error('Roadmap insert error:', JSON.stringify(insertError))
+      throw new Error('Failed to save roadmap: ' + insertError.message)
     }
 
-    console.log("=== ROADMAP SAVED SUCCESSFULLY ===")
+    console.log('=== ROADMAP SAVED SUCCESSFULLY ===')
 
-    return Response.json({
+    return NextResponse.json({
       success: true,
       recommendation: parsed.recommendation,
       reasoning: parsed.reasoning
     })
 
   } catch (error) {
-    console.error("=== ROUTE ERROR ===")
-    console.error("Error message:", error.message)
-    console.error("userId at time of error:", userId)
+    console.error('=== ROUTE ERROR ===')
+    console.error('Error message:', error instanceof Error ? error.message : String(error))
+    console.error('userId at time of error:', userId)
 
     // Try fallback insert if we have a userId
     if (userId) {
-      console.log("Attempting fallback insert...")
+      console.log('Attempting fallback insert...')
       const { error: fallbackError } = await supabase.from('roadmap').insert([{
         user_id: userId,
-        milestone_title: "Start your journey",
-        description: "Auron is setting up your personalised roadmap. Check back shortly.",
-        due_date: "2026-06-01",
-        category: "career",
-        status: "pending",
+        milestone_title: 'Start your journey',
+        description: 'Auron is setting up your personalised roadmap. Check back shortly.',
+        due_date: '2026-06-01',
+        category: 'career',
+        status: 'pending',
         version: 1
       }])
 
       if (fallbackError) {
-        console.error("Fallback also failed:", JSON.stringify(fallbackError))
+        console.error('Fallback also failed:', JSON.stringify(fallbackError))
       } else {
-        console.log("Fallback milestone inserted successfully")
+        console.log('Fallback milestone inserted successfully')
       }
     }
 
-    return Response.json({
+    return NextResponse.json({
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
     }, { status: 500 })
   }
 }
